@@ -8,6 +8,9 @@
 # important: slider indexes start at 0, regardless of which analog pins you're using!
 slider_mapping:
   0: master
+  1: spotify
+  2:
+  3: mic
 
 # set this to true if you want the controls inverted (i.e. top is 0%, bottom is 100%)
 invert_sliders: false
@@ -19,6 +22,7 @@ baud_rate: 9600
 # settings for hid_listen (qmk)
 enable_hid_listen: true
 
+# settings for connecting to HID device
 vendor_id: 0x23F2
 product_id: 0x78E3
 usage_page: 0xFF60

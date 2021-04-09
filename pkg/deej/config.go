@@ -18,10 +18,19 @@ import (
 type CanonicalConfig struct {
 	SliderMapping *sliderMap
 
-	ConnectionInfo struct {
+	SerialConnectionInfo struct {
 		COMPort  string
 		BaudRate int
 	}
+
+	HidConnectionInfo struct {
+		VendorId  uint16
+		ProductId uint16
+		UsagePage uint16
+		Usage     uint16
+	}
+
+	EnableHidListen bool
 
 	InvertSliders bool
 
@@ -53,6 +62,11 @@ const (
 	configKeyCOMPort             = "com_port"
 	configKeyBaudRate            = "baud_rate"
 	configKeyNoiseReductionLevel = "noise_reduction"
+	configKeyVendorId            = "vendor_id"
+	configKeyProductId           = "product_id"
+	configKeyUsagePage           = "usage_page"
+	configKeyUsage               = "usage"
+	configKeyEnableHID           = "enable_hid_listen"
 
 	defaultCOMPort  = "COM4"
 	defaultBaudRate = 9600
@@ -89,6 +103,7 @@ func NewConfig(logger *zap.SugaredLogger, notifier Notifier) (*CanonicalConfig, 
 	userConfig.SetDefault(configKeyInvertSliders, false)
 	userConfig.SetDefault(configKeyCOMPort, defaultCOMPort)
 	userConfig.SetDefault(configKeyBaudRate, defaultBaudRate)
+	userConfig.SetDefault(configKeyEnableHID, false)
 
 	internalConfig := viper.New()
 	internalConfig.SetConfigName(internalConfigName)
@@ -145,7 +160,8 @@ func (cc *CanonicalConfig) Load() error {
 	cc.logger.Info("Loaded config successfully")
 	cc.logger.Infow("Config values",
 		"sliderMapping", cc.SliderMapping,
-		"connectionInfo", cc.ConnectionInfo,
+		"serialSonnectionInfo", cc.SerialConnectionInfo,
+		"hidConectionInfo", cc.HidConnectionInfo,
 		"invertSliders", cc.InvertSliders)
 
 	return nil
@@ -223,17 +239,25 @@ func (cc *CanonicalConfig) populateFromVipers() error {
 		cc.internalConfig.GetStringMapStringSlice(configKeySliderMapping),
 	)
 
-	// get the rest of the config fields - viper saves us a lot of effort here
-	cc.ConnectionInfo.COMPort = cc.userConfig.GetString(configKeyCOMPort)
+	// Get HID Config
+	cc.EnableHidListen = cc.userConfig.GetBool(configKeyEnableHID)
 
-	cc.ConnectionInfo.BaudRate = cc.userConfig.GetInt(configKeyBaudRate)
-	if cc.ConnectionInfo.BaudRate <= 0 {
+	cc.HidConnectionInfo.ProductId = uint16(cc.userConfig.GetUint32(configKeyProductId))
+	cc.HidConnectionInfo.VendorId = uint16(cc.userConfig.GetUint32(configKeyVendorId))
+	cc.HidConnectionInfo.UsagePage = uint16(cc.userConfig.GetUint32(configKeyUsagePage))
+	cc.HidConnectionInfo.Usage = uint16(cc.userConfig.GetUint32(configKeyUsage))
+
+	// get the rest of the config fields - viper saves us a lot of effort here
+	cc.SerialConnectionInfo.COMPort = cc.userConfig.GetString(configKeyCOMPort)
+
+	cc.SerialConnectionInfo.BaudRate = cc.userConfig.GetInt(configKeyBaudRate)
+	if cc.SerialConnectionInfo.BaudRate <= 0 && cc.EnableHidListen == false {
 		cc.logger.Warnw("Invalid baud rate specified, using default value",
 			"key", configKeyBaudRate,
-			"invalidValue", cc.ConnectionInfo.BaudRate,
+			"invalidValue", cc.SerialConnectionInfo.BaudRate,
 			"defaultValue", defaultBaudRate)
 
-		cc.ConnectionInfo.BaudRate = defaultBaudRate
+		cc.SerialConnectionInfo.BaudRate = defaultBaudRate
 	}
 
 	cc.InvertSliders = cc.userConfig.GetBool(configKeyInvertSliders)
