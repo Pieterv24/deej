@@ -126,7 +126,12 @@ func (hidraw *HIDRAW) readHID(logger *zap.SugaredLogger) chan []byte {
 		for {
 			buff := make([]byte, 32)
 			if _, err := hidraw.hidDevice.Read(buff); err != nil {
-				logger.Warn("Failed to read buffer")
+
+				if hidraw.deej.Verbose() {
+					logger.Warn("Failed to read buffer")
+				}
+
+				return
 			}
 
 			ch <- buff
