@@ -106,6 +106,9 @@ func (hidraw *HIDRAW) Start() error {
 	go func() {
 		buffChannel := hidraw.readHID(namedLogger)
 
+		// Send current slider values to controller
+		hidraw.sendSliderValues(namedLogger)
+
 		for {
 			select {
 			case <-hidraw.stopChannel:
@@ -117,6 +120,25 @@ func (hidraw *HIDRAW) Start() error {
 	}()
 
 	return nil
+}
+
+func (hidraw *HIDRAW) sendSliderValues(logger *zap.SugaredLogger) {
+	hidraw.deej.config.SliderMapping.iterate(func(slider int, targets []string) {
+		sliderVolume := hidraw.deej.sessions.getSliderVolume(slider, targets)
+
+		sliderVolume *= 100
+		percentVolume := uint16(sliderVolume)
+
+		message := make([]byte, 32)
+		message[0] = 0x03
+		message[1] = 0xFF
+		message[2] = byte(slider)
+		message[3] = byte((percentVolume >> 8) & 0xFF)
+		message[4] = byte(percentVolume & 0xFF)
+
+		logger.Debugf("Writing to device: %v", percentVolume)
+		hidraw.hidDevice.Write(message)
+	})
 }
 
 func (hidraw *HIDRAW) readHID(logger *zap.SugaredLogger) chan []byte {
@@ -144,6 +166,10 @@ func (hidraw *HIDRAW) readHID(logger *zap.SugaredLogger) chan []byte {
 func (hidraw *HIDRAW) handleBuff(logger *zap.SugaredLogger, buff []byte) {
 	// 0xFD signifies a deej command
 	if buff[0] == 0xFD {
+		if buff[1] == 0xDD {
+			logger.Debugf("Got them DD's")
+			return
+		}
 		// The 2nd byte is the adressed slider
 		slider := int(buff[1])
 

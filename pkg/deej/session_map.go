@@ -206,6 +206,35 @@ func (m *sessionMap) sessionMapped(session Session) bool {
 	return matchFound
 }
 
+func (m *sessionMap) getSliderVolume(slider int, targets []string) float32 {
+	var average float32
+	var count int
+
+	for _, target := range targets {
+		resolvedTargets := m.resolveTarget(target)
+
+		for _, resolvedTarget := range resolvedTargets {
+			sessions, ok := m.get(resolvedTarget)
+
+			if !ok {
+				continue
+			}
+
+			for _, session := range sessions {
+				count++
+				average += session.GetVolume()
+			}
+		}
+	}
+
+	if count > 0 {
+		average /= float32(count)
+		return average
+	} else {
+		return 0
+	}
+}
+
 func (m *sessionMap) handleSliderMoveEvent(event SliderMoveEvent) {
 
 	// first of all, ensure our session map isn't moldy
