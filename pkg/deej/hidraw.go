@@ -1,13 +1,11 @@
 package deej
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/omriharel/deej/pkg/deej/util"
 	"github.com/sstallion/go-hid"
 	"go.uber.org/zap"
 )
@@ -107,7 +105,7 @@ func (hidraw *HIDRAW) Start() error {
 		buffChannel := hidraw.readHID(namedLogger)
 
 		// Send current slider values to controller
-		hidraw.sendSliderValues(namedLogger)
+		// hidraw.sendSliderValues(namedLogger)
 
 		for {
 			select {
@@ -172,19 +170,31 @@ func (hidraw *HIDRAW) handleBuff(logger *zap.SugaredLogger, buff []byte) {
 		}
 		// The 2nd byte is the adressed slider
 		slider := int(buff[1])
+		down := buff[2] == 0
 
-		// The 3th and 4th byte contain the value
-		val := binary.BigEndian.Uint16(buff[2:4])
+		// Get current volume
+		sliderMap, _ := hidraw.deej.config.SliderMapping.get(slider)
+		sliderVolume := hidraw.deej.sessions.getSliderVolume(slider, sliderMap)
 
-		// Doing stuff stolen from serial.go code
-		dirtyFloat := float32(val) / 100
-		normalizedScalar := util.NormalizeScalar(dirtyFloat)
+		// Set new volume in case of volume down
+		if down && sliderVolume-0.05 >= 0 {
+			sliderVolume -= 0.05
+		} else if down {
+			sliderVolume = 0
+		}
+
+		// Set new volume in case of volume up
+		if !down && sliderVolume+0.05 <= 1.0 {
+			sliderVolume += 0.05
+		} else if !down {
+			sliderVolume = 1.0
+		}
 
 		// Notify consumers of slider changes
 		for _, consumer := range hidraw.sliderMoveConsumers {
 			moveEvent := SliderMoveEvent{
 				SliderID:     slider,
-				PercentValue: normalizedScalar,
+				PercentValue: sliderVolume,
 			}
 
 			consumer <- moveEvent
